@@ -1,0 +1,13 @@
+{
+  "name": "telegram-cycle-bot",
+  "version": "1.0.0",
+  "description": "Bot de ciclos via Telegram com Telegraf",
+  "main": "bot.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
