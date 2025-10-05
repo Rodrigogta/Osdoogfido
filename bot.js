@@ -465,9 +465,8 @@ async function verificar_hora() {
   const agora = new Date();
   const data_atual = agora.toLocaleDateString('pt-BR', { timeZone: fuso });
 
-  const hora_atual = agora.getHours();
-  const minuto_atual = agora.getMinutes();
-  const minuto_atual_str = agora.toLocaleString('pt-BR', { timeZone: fuso, minute: '2-digit' });
+  // Usa o fuso configurado para obter hora e minuto atuais de forma consistente
+  const { hour: hora_atual, minute: minuto_atual, minuteStr: minuto_atual_str } = getNowInTimezone();
 
   console.log(`[HORA] Verificando: ${hora_atual}:${minuto_atual_str}, Ciclo atual: ${ciclo}, Ciclos ativos: ${ciclos}`);
 
@@ -496,19 +495,27 @@ async function verificar_hora() {
     return;
   }
 
-  const hora_ciclo = parseInt(horas[ciclo], 10);
-  console.log(`[DEBUG] Hora atual: ${hora_atual}, Hora ciclo: ${hora_ciclo}, Minuto: ${minuto_atual}`);
-
-  if (hora_atual > hora_ciclo || (hora_atual === hora_ciclo && minuto_atual > 15)) {
-    console.log(`[CICLO] ⏩ Pulando ciclo ${ciclo + 1} (${hora_ciclo}:00) - já passou do horário.`);
-    ciclo++;
-    if (ciclo < horas.length) {
-      console.log(`[CICLO] 🔄 Verificando próximo ciclo ${ciclo + 1}...`);
-      setTimeout(() => verificar_hora(), 1000);
+  // Avançar rapidamente todos os ciclos com hora menor que a atual
+  console.log(`[DEBUG] Hora atual: ${hora_atual}, Ciclo inicial: ${ciclo}`);
+  while (ciclo < horas.length) {
+    const hc = parseInt(horas[ciclo], 10);
+    if (hora_atual > hc) {
+      console.log(`[CICLO] ⏩ Pulando ciclo ${ciclo + 1} (${hc}:00) - já passou do horário.`);
+      ciclo++;
+      continue;
     }
+    break;
+  }
+
+  if (ciclo >= horas.length) {
+    console.log('[CICLO] ✅ Todos os ciclos do dia foram processados.');
     return;
   }
 
+  const hora_ciclo = parseInt(horas[ciclo], 10);
+  console.log(`[DEBUG] Hora atual: ${hora_atual}, Hora ciclo vigente: ${hora_ciclo}, Minuto: ${minuto_atual}`);
+
+  // Ainda não chegou a hora do próximo ciclo
   if (hora_atual < hora_ciclo) {
     if (!ciclos_enviados[`espera_${ciclo}`]) {
       console.log(`[CICLO] ⏳ Aguardando horário do ciclo ${ciclo + 1} (${hora_ciclo}:00)...`);
@@ -526,6 +533,7 @@ async function verificar_hora() {
     return;
   }
 
+  // Evita reiniciar caso já tenha sido iniciado
   if (ciclos_enviados[hora_ciclo] === ciclo) {
     console.log(`[CICLO] ✅ Ciclo ${ciclo + 1} já foi iniciado anteriormente.`);
     return;
@@ -564,6 +572,24 @@ async function verificar_hora() {
   } else {
     console.log(`[CICLO] ❌ Nenhuma entrada gerada para o ciclo ${ciclo + 1}.`);
   }
+}
+
+// Helper: hora/minuto atuais no fuso configurado
+function getNowInTimezone() {
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: fuso,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+
+  let hourStr = '00';
+  let minuteStr = '00';
+  for (const p of parts) {
+    if (p.type === 'hour') hourStr = p.value;
+    if (p.type === 'minute') minuteStr = p.value;
+  }
+  return { hour: parseInt(hourStr, 10), minute: parseInt(minuteStr, 10), minuteStr };
 }
 
 // COMANDOS
@@ -1082,5 +1108,18 @@ process.once('SIGTERM', () => {
   if (screenshotBot) screenshotBot.stop('SIGTERM');
 });
 
-// Iniciar aplicação (não iniciar automaticamente em ambiente de testes)
-iniciar();
+// Iniciar aplicação ou executar em modo ONESHOT (diagnóstico rápido)
+if (process.env.ONESHOT === '1') {
+  (async () => {
+    try {
+      console.log('🧪 ONESHOT: executando verificar_hora() uma vez para diagnóstico.');
+      await verificar_hora();
+    } catch (e) {
+      console.error('Erro no modo ONESHOT:', e);
+    } finally {
+      process.exit(0);
+    }
+  })();
+} else {
+  iniciar();
+}
