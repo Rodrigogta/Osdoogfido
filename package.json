@@ -1,0 +1,17 @@
+{
+  "name": "telegram-bot-ciclos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "smoke": "SMOKE_TEST=1 node -e \"setTimeout(()=>process.exit(0), 15000); require('./bot');\""
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "screenshot-desktop": "^1.14.0",
+    "telegraf": "^4.16.3"
+  }
+}
